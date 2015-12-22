@@ -22,7 +22,7 @@ from google.appengine.ext import db
 
 class MainHandler(webapp2.RequestHandler):
     def get(self):
-        return self.redirect('https://www.duplicati.com')
+        return self.redirect('https://github.com/duplicati/usage-reporter')
 
 
 def setprops(item, props):
@@ -36,7 +36,7 @@ def setprops(item, props):
 @db.transactional(xg=True)
 def addPostInTx(rst):
 
-    setprops(rst, ['setid', 'uid', 'ostype', 'osversion', 'clrversion', 'appname', 'assembly'])
+    setprops(rst, ['setid', 'uid', 'ostype', 'osversion', 'clrversion', 'appname', 'appversion', 'assembly'])
 
     dbr = dbmodel.ReportSet(
         setid = rst['setid'],
@@ -45,6 +45,7 @@ def addPostInTx(rst):
         osversion = rst['osversion'],
         clrversion = rst['clrversion'],
         appname = rst['appname'],
+        appversion = rst['appversion'],
         assembly = rst['assembly']
     )
 
