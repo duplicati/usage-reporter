@@ -15,83 +15,15 @@
 # limitations under the License.
 #
 import webapp2
-import dbmodel
-import json
+import os
 
-from google.appengine.ext import db
+TESTING = os.environ.get('SERVER_SOFTWARE','').startswith('Development')
+
 
 class MainHandler(webapp2.RequestHandler):
     def get(self):
         return self.redirect('https://github.com/duplicati/usage-reporter')
 
-
-def setprops(item, props):
-    for p in props:
-        if not item.has_key(p):
-            item[p] = ''
-        elif type(item[p]) != type(''):
-            item[p] = str(item[p])
-
-
-@db.transactional(xg=True)
-def addPostInTx(rst):
-
-    setprops(rst, ['setid', 'uid', 'ostype', 'osversion', 'clrversion', 'appname', 'appversion', 'assembly'])
-
-    dbr = dbmodel.ReportSet(
-        setid = rst['setid'],
-        uid = rst['uid'],
-        ostype = rst['ostype'],
-        osversion = rst['osversion'],
-        clrversion = rst['clrversion'],
-        appname = rst['appname'],
-        appversion = rst['appversion'],
-        assembly = rst['assembly']
-    )
-
-    dbr.put()
-
-    for n in rst['items']:
-
-        setprops(n, ['type', 'name', 'data'])
-
-        ts = 0
-        c = 0
-        data = None
-
-
-        try:
-            if (n.has_key('timestamp')):
-                ts = long(n['timestamp'])
-        except:
-            pass
-
-        try:
-            if (n.has_key('count')):
-                c = long(n['count'])
-        except:
-            pass
-
-        ri = dbmodel.ReportItem(
-            reportset = dbr, 
-            timestamp = ts,
-            eventtype = n['type'],
-            count = c,
-            name = n['name'],
-            data = n['data']
-        ).put()
-
-
-
-class ReportHandler(webapp2.RequestHandler):
-    def post(self):
-        rst = json.loads(self.request.body)
-        if rst['items'] != None and type(rst['items']) == type([]) and len(rst['items']) > 0:
-            addPostInTx(rst)
-
-
-
 app = webapp2.WSGIApplication([
     ('/', MainHandler),
-    ('/api/v1/report', ReportHandler)
-], debug=True)
+], debug=TESTING)

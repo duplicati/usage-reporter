@@ -9,6 +9,29 @@ handlers:
   static_files: favicon.ico
   upload: favicon\.ico
 
+- url: /\.well-known/acme-challenge/.*
+  script: letsencrypt.app
+
+- url: /api/v1/.*
+  script: apiv1.app
+  secure: always
+
+- url: /tasks/cron/.*
+  script: aggregate.app
+  login: admin
+
+- url: /tasks/admin/.*
+  script: admin.app
+  login: admin
+
+- url: /
+  static_files: index.html
+  upload: index.html
+
+- url: /index\..*
+  static_files: index.html
+  upload: index.html
+
 - url: .*
   script: main.app
 

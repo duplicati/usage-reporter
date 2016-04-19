@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/angular-chart.js/0.10.0/angular-chart.css">
+
+<body>
+
+<div ng-app="myApp" ng-controller="myCtrl">
+
+	<h1>Usage statistics for <a href="https://www.duplicati.com">Duplicati</a></h1>
+
+	<table>
+		<tr>
+			<td>Range</td>
+			<td>
+				<select id="granularity" ng-model="rangetype">
+					<option value="day">Day</option>
+					<option value="week">Week</option>
+					<option value="month">Month</option>
+					<option value="year">Year</option>
+				</select>
+			</td>
+		</tr>
+
+		<tr>
+			<td>Feature</td>
+			<td>
+				<select id="valuetype" ng-model="valuetype">
+					<option value="USE_BACKEND">Backend</option>
+					<option value="USE_ENCRYPTION">Encryption</option>
+					<option value="USE_COMPRESSION">Compression</option>
+					<option value="DURATION">Duration</option>
+					<option value="SIZE">Size</option>
+					<option value="OS">Operating system</option>
+				</select>
+			</td>
+		</tr>
+	</table>
+
+
+
+	<canvas id="line" class="chart chart-line" chart-data="data" chart-labels="labels" chart-legend="true" chart-series="series" chart-options="{}" chart-click="onClick" >
+	</canvas> 
+
+	<a href="https://github.com/duplicati/usage-reporter">Source code for this site is on GitHub</a>
+	<p>Data was last updated {{lastupdated}}</p>
+
+</div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/1.0.2/Chart.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/angular-chart.js/0.10.0/angular-chart.min.js"></script>
+
+<script type="text/javascript">
+
+// The isoWeek handling is from here:
+// http://techblog.procurios.nl/k/news/view/33796/14863/calculate-iso-8601-week-and-year-in-javascript.html
+
+Date.prototype.getWeek = function () {
+	var target  = new Date(this.valueOf());
+
+	var dayNr   = (this.getDay() + 6) % 7;
+	target.setDate(target.getDate() - dayNr + 3);
+	var firstThursday = target.valueOf();
+	target.setMonth(0, 1);
+	if (target.getDay() != 4) {
+		target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+	}
+
+	return 1 + Math.ceil((firstThursday - target) / 604800000); // 604800000 = 7 * 24 * 3600 * 1000
+}
+
+
+Date.prototype.getWeekYear = function () 
+{
+	var target	= new Date(this.valueOf());
+	target.setDate(target.getDate() - ((this.getDay() + 6) % 7) + 3);
+	
+	return target.getFullYear();
+}
+
+
+var app = angular.module('myApp', ['chart.js']);
+app.controller('myCtrl', function($scope, $http) {
+	$scope.isLoading = false;
+	$scope.shouldReload = false;
+
+	$scope.rangetype = 'day';
+	$scope.valuetype = 'OS';
+
+	$scope.last_data = null;
+	$scope.last_range = null;
+	$scope.lastupdated_timestamp = 0;
+
+	function parseResults(data, range, filter) {
+
+		var label_lookup = {};
+		var labels = [];
+
+		for (var i = data.items.length - 1; i >= 0; i--) {
+			var el = data.items[i];
+
+			$scope.lastupdated_timestamp = Math.max($scope.lastupdated_timestamp, el.lastupdated);
+
+			if (label_lookup[el.timestamp] == null) {
+				var date = new Date(el.timestamp*1000);
+				var label = date.toISOString();
+
+				if (range == 'day')
+					label = label.match(/(\d{4}-\d{2}-\d{2})/)[0];
+				else if (range == 'week')
+					label = 'Week ' + date.getWeek() + ', ' + date.getWeekYear();
+				else if (range == 'month')
+					label = label.match(/(\d{4}-\d{2})/)[0];
+				else if (range == 'year')
+					label = label.match(/(\d{4})/)[0];
+
+				label_lookup[el.timestamp] = label;
+				labels[labels.length] = label;
+			}
+		}
+
+		labels.sort();
+		for(var i in label_lookup) {
+			for (var j = labels.length - 1; j >= 0; j--) {
+				if (label_lookup[i] == labels[j]) {
+					label_lookup[i] = j;
+					break;
+				}
+			}
+		}
+
+		var series_lookup = {};
+		var entrycounts = [];
+		var entrysums = [];
+		var series_labels = [];
+
+		for (var i = data.items.length - 1; i >= 0; i--) {
+			var el = data.items[i];
+
+			var series_key = null;
+			if (filter == 'OS')
+				series_key = el.ostype;
+			else if (filter == 'DURATION' && el.name == 'BACKUP_DURATION')
+				series_key = el.ostype;
+			else if (filter == 'SIZE' && el.name == 'BACKUP_FILESIZE')
+				series_key = el.ostype;
+			else if (el.name == filter)
+				series_key = el.value;
+
+			if (filter == 'USE_ENCRYPTION' && series_key == '')
+				series_key = 'none';
+
+			if (filter == 'OS' && el.name != 'Started')
+				continue;
+
+			if (series_key != null) {
+				if (series_lookup[series_key] == null) {
+					series_labels[entrycounts.length] = series_key;
+					series_lookup[series_key] = entrycounts.length;
+					entrysums[entrycounts.length] = [];
+					entrycounts[entrycounts.length] = [];
+					for (var j = labels.length - 1; j >= 0; j--) {
+						entrysums[entrycounts.length - 1][j] = 0;
+						entrycounts[entrycounts.length - 1][j] = 0;
+					}
+				}
+
+				var entry_array = entrycounts[series_lookup[series_key]];
+				entry_array[label_lookup[el.timestamp]] += el.count;
+
+				var entry_array = entrysums[series_lookup[series_key]];
+				entry_array[label_lookup[el.timestamp]] += el.sum;
+			}
+		}
+
+		if (filter == "DURATION" || filter == "SIZE")
+			for (var i = entrysums.length - 1; i >= 0; i--)
+				for (var j = entrysums[i].length - 1; j >= 0; j--)
+					entrycounts[i][j] = entrysums[i][j] / Math.max(1, entrycounts[i][j]);
+
+		$scope.labels = labels;
+		$scope.series = series_labels;
+		$scope.data = entrycounts;
+	};
+
+	$scope.load = function() {
+
+		var range = $scope.rangetype;
+		var filter = $scope.valuetype;
+
+		if ($scope.last_data != null) {
+			if ($scope.last_range == range && $scope.last_filter == filter)
+				return;
+
+			if ($scope.last_range == range) {
+				$scope.last_filter = filter;
+				parseResults($scope.last_data, $scope.last_range, filter);
+				return;
+			}
+		}
+
+		if ($scope.isLoading) {
+			$scope.shouldReload = true;
+			return;
+		}
+
+		$scope.isLoading = true;
+		$scope.shouldReload = false;
+
+	    $http.get('/api/v1/view?page_size=30&page_offset=0&rangetype=' + range).then(function(response) {
+	    	$scope.isLoading = false;
+
+			$scope.last_data = response.data;
+			$scope.last_range = range;
+			$scope.last_filter = filter;
+
+	        parseResults(response.data, range, filter);
+
+	    	if ($scope.shouldReload)
+	    		$scope.load();
+
+	    }, function(response) {
+	    	alert('Failed to load data: ' + response.status);
+
+	    	$scope.isLoading = false;
+	    	if ($scope.shouldReload)
+	    		$scope.load();
+
+	    });
+	};
+
+	$scope.onClick = function (points, evt) {
+    	console.log(points, evt);
+  	};
+
+  	$scope.load();
+
+  	$scope.$watch('rangetype', function() { $scope.load(); });
+  	$scope.$watch('valuetype', function() { $scope.load(); });
+  	$scope.$watch('lastupdated_timestamp', function() { $scope.lastupdated = (new Date($scope.lastupdated_timestamp*1000)).toISOString(); });
+});
+
+</script>
+
+</body>
+</html>

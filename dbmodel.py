@@ -23,3 +23,25 @@ class ReportItem(db.Model):
     count = db.IntegerProperty(required=False)
     name = db.StringProperty(required=False)
     data = db.TextProperty(required=False)
+    counted = db.IntegerProperty(required=False)
+
+class AggregateItem(db.Model):
+    # day, month, year or week
+    rangetype = db.StringProperty(required=True)
+
+    # eg. 2016-01-01
+    # or 2016-01
+    # or 2016
+    # or 2016-w1
+    rangekey = db.StringProperty(required=True)
+    timestamp = db.IntegerProperty(required=True)
+
+    value_sum = db.IntegerProperty(required=True)
+    entry_count = db.IntegerProperty(required=True)
+
+    ostype = db.StringProperty(required=True)
+    name = db.StringProperty(required=True)
+    value = db.StringProperty(required=False)
+    lastupdated = db.IntegerProperty(required=False)
+
+

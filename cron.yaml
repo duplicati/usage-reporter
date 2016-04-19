@@ -1,0 +1,5 @@
+cron:
+
+- description: update aggregate stats
+  url: /tasks/cron/aggregate
+  schedule: every 6 hours
