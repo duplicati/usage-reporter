@@ -27,6 +27,12 @@ indexes:
   - name: rangetype
   - name: timestamp
 
+- kind: AggregateItem
+  properties:
+  - name: rangetype
+  - name: timestamp
+    direction: desc
+
 - kind: ReportItem
   properties:
   - name: counted

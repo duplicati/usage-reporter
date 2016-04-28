@@ -151,10 +151,22 @@ class ViewHandler(webapp2.RequestHandler):
 
         cacheurl = '%s:/view?fromtime=%s&rangetype=%s&page_size=%s&page_offset=%s' %(ix, starttime, rangetype, page_size, page_offset)
         res = memcache.get(cacheurl)
-        if res == None:
 
-            items = [{'name': x.name, 'value': x.value, 'ostype': x.ostype, 'sum': x.value_sum, 'count': x.entry_count, 'lastupdated': x.lastupdated, 'timestamp': x.timestamp} for x in dbmodel.AggregateItem.all().filter('timestamp <=', starttime).filter('rangetype', rangetype).order('timestamp').run(limit=page_size, offset=page_offset)]
-            res = json.dumps({'kind': 'aggregate-' + rangetype, 'page_size': page_size, 'offset': page_offset, 'fromtime': starttime, 'rangetype': rangetype, 'items': items, 'fetched': calendar.timegm(datetime.datetime.utcnow().timetuple())})
+        if res == None:
+            remains = page_size
+            prevtime = None
+            items = []
+
+            for x in dbmodel.AggregateItem.all().filter('timestamp <=', starttime).filter('rangetype', rangetype).order('-timestamp').run(offset=page_offset):
+                if prevtime != x.timestamp:
+                    prevtime = x.timestamp
+                    if remains == 0:
+                        break
+                    remains -= 1
+
+                items.append({'name': x.name, 'value': x.value, 'ostype': x.ostype, 'sum': x.value_sum, 'count': x.entry_count, 'lastupdated': x.lastupdated, 'timestamp': x.timestamp})
+
+            res = json.dumps({'kind': 'aggregate-' + rangetype, 'page_size': page_size, 'offset': page_offset, 'next_offset': page_offset + len(items), 'count': len(items), 'fromtime': starttime, 'rangetype': rangetype, 'items': items, 'fetched': calendar.timegm(datetime.datetime.utcnow().timetuple())})
 
             memcache.add(cacheurl, res)
 

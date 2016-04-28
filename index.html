@@ -108,7 +108,13 @@ app.controller('myCtrl', function($scope, $http) {
 				if (range == 'day')
 					label = label.match(/(\d{4}-\d{2}-\d{2})/)[0];
 				else if (range == 'week')
-					label = 'Week ' + date.getWeek() + ', ' + date.getWeekYear();
+				{
+					var w = date.getWeek() + '';
+					if (w.length == 1)
+						w = '0' + w;
+
+					label = date.getWeekYear() + ', Week ' + w;
+				}
 				else if (range == 'month')
 					label = label.match(/(\d{4}-\d{2})/)[0];
 				else if (range == 'year')
@@ -150,7 +156,7 @@ app.controller('myCtrl', function($scope, $http) {
 			if (filter == 'USE_ENCRYPTION' && series_key == '')
 				series_key = 'none';
 
-			if (filter == 'OS' && el.name != 'Started')
+			if (filter == 'OS' && el.name != 'USE_BACKEND')
 				continue;
 
 			if (series_key != null) {
@@ -207,7 +213,7 @@ app.controller('myCtrl', function($scope, $http) {
 		$scope.isLoading = true;
 		$scope.shouldReload = false;
 
-	    $http.get('/api/v1/view?page_size=30&page_offset=0&rangetype=' + range).then(function(response) {
+	    $http.get('/api/v1/view?page_size=7&page_offset=0&rangetype=' + range).then(function(response) {
 	    	$scope.isLoading = false;
 
 			$scope.last_data = response.data;
