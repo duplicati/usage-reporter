@@ -19,6 +19,7 @@ class AggregateHandler(webapp2.RequestHandler):
 
     def get(self):
         today_ts = None
+
         try:
             today_ts = int(self.request.get('timestamp', None))
         except:
@@ -45,10 +46,22 @@ class AggregateHandler(webapp2.RequestHandler):
         elif rangekey == 'year':
             self.process_range(today, 'year')
         else:
-            if self.process_days(today) > 0:
-                # If new entries were discovered, schedule weekly and mothly updates
-                taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'week'}, eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=10))
-                taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'month'}, eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=15))
+            while True:
+                if self.process_days(today) > 0:
+                    # If new entries were discovered, schedule weekly and mothly updates
+                    taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'week'}, eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=10))
+                    taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'month'}, eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=15))
+
+                next_entry = min_day_entry = dbmodel.ReportItem.all().filter('counted =', None).filter('eventtype =', 'Information').order('timestamp').get()
+                
+                if next_entry == None or next_entry.timestamp == today_ts:
+                    logging.info('No more stuff to do, quitting')
+                    break
+
+                today_ts = next_entry.timestamp
+                today = datetime.datetime.utcfromtimestamp(next_entry.timestamp).date()
+                logging.info('Rerun, handling date %s', today.isoformat())
+
 
 
     def update_day_record(self, rangekey, timestamp, item):
