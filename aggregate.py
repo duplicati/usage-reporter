@@ -52,7 +52,7 @@ class AggregateHandler(webapp2.RequestHandler):
                     taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'week'}, eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=10))
                     taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'month'}, eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=15))
 
-                next_entry = min_day_entry = dbmodel.ReportItem.all().filter('counted =', None).filter('eventtype =', 'Information').order('timestamp').get()
+                next_entry = dbmodel.ReportItem.all().filter('counted =', None).filter('eventtype =', 'Information').order('timestamp').get()
                 
                 if next_entry == None or next_entry.timestamp == today_ts:
                     logging.info('No more stuff to do, quitting')
