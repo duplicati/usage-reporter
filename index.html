@@ -78,6 +78,30 @@ Date.prototype.getWeekYear = function ()
 	return target.getFullYear();
 }
 
+var supportedbackends = {
+	'aftp': 'Alternative FTP', 
+	'amzcd': 'Amazon Cloud Drive',
+	'azure': 'Azure Blob',
+	'b2': 'Backblaze',
+	'box': 'box.com',
+	'cloudfiles': 'CloudFiles',
+	'dropbox': 'DropBox',
+	'file': 'File storage',
+	'ftp': 'FTP',
+	'gcs': 'Google Cloud Storage',
+	'googledrive': 'Google Drive',
+	'hubic': 'HubiC',
+	'mega': 'Mega.nz',
+	'onedrive': 'OneDrive',
+	'openstack': 'OpenStack',
+	's3': 'S3 compatible',
+	'od4b': 'OneDrive for Business',
+	'mssp': 'Sharepoint',
+	'ssh': 'SSH (SFTP)',
+	'tahoe': 'Tahoe LAFS',
+	'webdav': 'WebDAV',
+	'': 'Other'
+}
 
 var app = angular.module('myApp', ['chart.js']);
 app.controller('myCtrl', function($scope, $http) {
@@ -152,9 +176,23 @@ app.controller('myCtrl', function($scope, $http) {
 				series_key = el.ostype;
 			else if (el.name == filter)
 				series_key = el.value;
+			else
+				continue;
+
 
 			if (filter == 'USE_ENCRYPTION' && series_key == '')
 				series_key = 'none';
+
+			if (filter == 'USE_BACKEND') {
+				if (series_key == null)
+					series_key = 'Other';
+				var lookup = supportedbackends[series_key];
+				if (lookup == null && series_key.length > 0 && series_key.substr(series_key.length - 1) == 's')
+					lookup = supportedbackends[series_key.substr(0, series_key.length - 1)];
+
+				series_key = lookup == null ? 'Other' : lookup;
+			}
+				
 
 			if (filter == 'OS' && el.name != 'USE_BACKEND')
 				continue;
