@@ -191,6 +191,11 @@ app.controller('myCtrl', function($scope, $http) {
 					lookup = supportedbackends[series_key.substr(0, series_key.length - 1)];
 
 				series_key = lookup == null ? 'Other' : lookup;
+
+				if (series_key == 'Other') {
+					//console.log('Using ' + el.value + ' as Other');
+					lookup = null;
+				}
 			}
 				
 
