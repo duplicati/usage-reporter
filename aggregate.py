@@ -34,6 +34,11 @@ class AggregateHandler(webapp2.RequestHandler):
                 today_ts = min_day_entry.timestamp
 
         today = datetime.datetime.utcfromtimestamp(today_ts).date()
+        # This will retry the request a few times before giving up, making a kind of flexible processing time
+        if self.request.get('put-in-queue', None) == "1":
+            taskqueue.add(queue_name='initial-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'day'})
+            return
+
         logging.info('Handling date %s', today.isoformat())
 
         rangekey = self.request.get('rangekey', 'day')

@@ -1,5 +1,5 @@
 cron:
 
 - description: update aggregate stats
-  url: /tasks/cron/aggregate
-  schedule: every 6 hours
+  url: /tasks/cron/aggregate?put-in-queue=1
+  schedule: every 3 hours
