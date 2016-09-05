@@ -35,10 +35,6 @@ class AggregateHandler(webapp2.RequestHandler):
 
         today = datetime.datetime.utcfromtimestamp(today_ts).date()
 
-        if (datetime.datetime.utcnow().date() - today).days < 3:
-            logging.info('Skipping run because entry is less than 5 days old')
-            return
-
         # This will retry the request a few times before giving up, making a kind of flexible processing time
         if self.request.get('put-in-queue', None) == "1":
             taskqueue.add(queue_name='initial-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'day'})
@@ -57,6 +53,11 @@ class AggregateHandler(webapp2.RequestHandler):
             self.process_range(today, 'year')
         else:
             while True:
+
+                if (datetime.datetime.utcnow().date() - today).days < 3:
+                    logging.info('Skipping run because entry is less than 3 days old')
+                    return
+
                 if self.process_days(today) > 0:
                     # If new entries were discovered, schedule weekly and mothly updates
                     taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'week'}, eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=10))
