@@ -34,6 +34,11 @@ class AggregateHandler(webapp2.RequestHandler):
                 today_ts = min_day_entry.timestamp
 
         today = datetime.datetime.utcfromtimestamp(today_ts).date()
+
+        if (datetime.datetime.utcnow().date() - today).days < 3:
+            logging.info('Skipping run because entry is less than 5 days old')
+            return
+
         # This will retry the request a few times before giving up, making a kind of flexible processing time
         if self.request.get('put-in-queue', None) == "1":
             taskqueue.add(queue_name='initial-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'day'})
