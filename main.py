@@ -14,15 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import webapp2
 import os
 
-TESTING = os.environ.get('SERVER_SOFTWARE','').startswith('Development')
+import webapp2
+
+TESTING = os.environ.get('SERVER_SOFTWARE', '').startswith('Development')
 
 
 class MainHandler(webapp2.RequestHandler):
     def get(self):
         return self.redirect('https://github.com/duplicati/usage-reporter')
+
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler),

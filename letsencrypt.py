@@ -1,14 +1,12 @@
-import webapp2
-import dbmodel
-import json
-import logging
 import os
 
+import webapp2
 from google.appengine.ext import db
 
-TESTING = os.environ.get('SERVER_SOFTWARE','').startswith('Development')
+TESTING = os.environ.get('SERVER_SOFTWARE', '').startswith('Development')
 
 from config import API_KEY
+
 
 class LetsEncryptEntry(db.Model):
     value = db.TextProperty(required=False)
@@ -25,10 +23,9 @@ class LetsEncryptHandler(webapp2.RequestHandler):
 
         self.response.write(entry.value)
 
-
     def post(self, key):
         if not self.request.headers.has_key('api-key') or self.request.headers['api-key'] != API_KEY:
-            #logging.info('Key was "%s", should be "%s"', self.request.headers['api-key'], API_KEY)
+            # logging.info('Key was "%s", should be "%s"', self.request.headers['api-key'], API_KEY)
             self.response.set_status(403, 'Permission denied')
             self.response.write('Permission denied')
             return

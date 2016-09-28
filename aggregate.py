@@ -1,16 +1,16 @@
-import webapp2
-import dbmodel
-import json
-import logging
-import datetime
 import calendar
+import datetime
+import logging
 import os
 
-from google.appengine.ext import db
+import webapp2
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
+from google.appengine.ext import db
 
-TESTING = os.environ.get('SERVER_SOFTWARE','').startswith('Development')
+import dbmodel
+
+TESTING = os.environ.get('SERVER_SOFTWARE', '').startswith('Development')
 
 
 class AggregateHandler(webapp2.RequestHandler):
@@ -26,7 +26,9 @@ class AggregateHandler(webapp2.RequestHandler):
             pass
 
         if today_ts == None:
-            min_day_entry = dbmodel.ReportItem.all().filter('counted =', None).filter('eventtype =', 'Information').order('timestamp').get()
+            min_day_entry = dbmodel.ReportItem.all().filter('counted =', None).filter('eventtype =',
+                                                                                      'Information').order(
+                'timestamp').get()
             if min_day_entry == None:
                 logging.info('No unprocessed entries, choosing today')
                 today_ts = calendar.timegm(datetime.datetime.utcnow().timetuple())
@@ -37,7 +39,8 @@ class AggregateHandler(webapp2.RequestHandler):
 
         # This will retry the request a few times before giving up, making a kind of flexible processing time
         if self.request.get('put-in-queue', None) == "1":
-            taskqueue.add(queue_name='initial-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'day'})
+            taskqueue.add(queue_name='initial-cron-updates', url='/tasks/cron/aggregate',
+                          params={'timestamp': str(today_ts), 'rangekey': 'day'})
             return
 
         logging.info('Handling date %s', today.isoformat())
@@ -48,7 +51,9 @@ class AggregateHandler(webapp2.RequestHandler):
         elif rangekey == 'month':
             if self.process_range(today, 'month'):
                 # If new entries were discovered, schedule yearly updates
-                taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'year'}, eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=10))
+                taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate',
+                              params={'timestamp': str(today_ts), 'rangekey': 'year'},
+                              eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=10))
         elif rangekey == 'year':
             self.process_range(today, 'year')
         else:
@@ -60,11 +65,17 @@ class AggregateHandler(webapp2.RequestHandler):
 
                 if self.process_days(today) > 0:
                     # If new entries were discovered, schedule weekly and mothly updates
-                    taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'week'}, eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=10))
-                    taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate', params={'timestamp': str(today_ts), 'rangekey': 'month'}, eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=15))
+                    taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate',
+                                  params={'timestamp': str(today_ts), 'rangekey': 'week'},
+                                  eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=10))
+                    taskqueue.add(queue_name='process-cron-updates', url='/tasks/cron/aggregate',
+                                  params={'timestamp': str(today_ts), 'rangekey': 'month'},
+                                  eta=datetime.datetime.utcnow() + datetime.timedelta(minutes=15))
 
-                next_entry = dbmodel.ReportItem.all().filter('counted =', None).filter('eventtype =', 'Information').order('timestamp').get()
-                
+                next_entry = dbmodel.ReportItem.all().filter('counted =', None).filter('eventtype =',
+                                                                                       'Information').order(
+                    'timestamp').get()
+
                 if next_entry == None or next_entry.timestamp == today_ts:
                     logging.info('No more stuff to do, quitting')
                     break
@@ -73,21 +84,21 @@ class AggregateHandler(webapp2.RequestHandler):
                 today = datetime.datetime.utcfromtimestamp(next_entry.timestamp).date()
                 logging.info('Rerun, handling date %s', today.isoformat())
 
-
-
     def update_day_record(self, rangekey, timestamp, item):
 
         @db.transactional(xg=True)
         def increment_record(rangekey, ostype, name, value, recordkey):
             key = '%s@%s:%s:%s' % (rangekey, ostype, name, value)
 
-            #logging.info('Key is %s, recordkey is %s', key, recordkey)
+            # logging.info('Key is %s, recordkey is %s', key, recordkey)
 
             record = db.get(recordkey)
 
             entry = dbmodel.AggregateItem.get_by_key_name(key)
             if entry == None:
-                entry = dbmodel.AggregateItem(key_name=key, rangetype='day', rangekey=rangekey, timestamp=timestamp, ostype=ostype, name=name, value=value, value_sum=0, entry_count=0, counted=0, counted_week=0)
+                entry = dbmodel.AggregateItem(key_name=key, rangetype='day', rangekey=rangekey, timestamp=timestamp,
+                                              ostype=ostype, name=name, value=value, value_sum=0, entry_count=0,
+                                              counted=0, counted_week=0)
             entry.value_sum += record.count
             entry.entry_count += 1
             entry.lastupdated = calendar.timegm(datetime.datetime.utcnow().timetuple())
@@ -110,7 +121,6 @@ class AggregateHandler(webapp2.RequestHandler):
             value = value.replace(':', '_')
 
         increment_record(rangekey, osname, name, value, item.key())
-
 
     def process_range(self, today, span):
 
@@ -141,7 +151,7 @@ class AggregateHandler(webapp2.RequestHandler):
             enddate = datetime.date(today.year + 1, 1, 1)
             base_key = str(startdate.year)
 
-        if startdate == None or enddate == None or base_key == None: 
+        if startdate == None or enddate == None or base_key == None:
             raise Exception('Bad interval')
 
         starttimestamp = calendar.timegm((startdate.year, startdate.month, startdate.day, 0, 0, 0))
@@ -158,14 +168,18 @@ class AggregateHandler(webapp2.RequestHandler):
         lookup = {}
 
         count = 0
-        for item in dbmodel.AggregateItem.all().filter('rangetype =', 'day').filter('timestamp >=', starttimestamp).filter('timestamp <', endtimestamp).order('timestamp'):
+        for item in dbmodel.AggregateItem.all().filter('rangetype =', 'day').filter('timestamp >=',
+                                                                                    starttimestamp).filter(
+                'timestamp <', endtimestamp).order('timestamp'):
 
             key = '%s@%s:%s:%s' % (base_key, item.ostype, item.name, item.value)
 
             if not lookup.has_key(key):
                 entry = dbmodel.AggregateItem.get_by_key_name(key)
                 if entry == None:
-                    entry = dbmodel.AggregateItem(key_name=key, rangetype=span, rangekey=base_key, timestamp=starttimestamp, ostype=item.ostype, name=item.name, value=item.value, value_sum=0, entry_count=0)
+                    entry = dbmodel.AggregateItem(key_name=key, rangetype=span, rangekey=base_key,
+                                                  timestamp=starttimestamp, ostype=item.ostype, name=item.name,
+                                                  value=item.value, value_sum=0, entry_count=0)
 
                 prev_count += entry.entry_count
 
@@ -187,17 +201,17 @@ class AggregateHandler(webapp2.RequestHandler):
         logging.info('Processed %s day entries for %s %s', count, span, today.isoformat())
         return count != prev_count
 
-
     def process_days(self, today):
         logging.info('Processing day %s', today.isoformat())
 
         starttimestamp = calendar.timegm((today.year, today.month, today.day, 0, 0, 0))
-        endtimestamp = starttimestamp + 24*60*60
+        endtimestamp = starttimestamp + 24 * 60 * 60
 
         base_key = today.isoformat()
-        
+
         count = 0
-        for item in dbmodel.ReportItem.all().filter('counted =', None).filter('eventtype =', 'Information').filter('timestamp <', endtimestamp).filter('timestamp >=', starttimestamp).order('timestamp'):
+        for item in dbmodel.ReportItem.all().filter('counted =', None).filter('eventtype =', 'Information').filter(
+                'timestamp <', endtimestamp).filter('timestamp >=', starttimestamp).order('timestamp'):
             self.update_day_record(base_key, starttimestamp, item)
             count += 1
 
@@ -205,6 +219,7 @@ class AggregateHandler(webapp2.RequestHandler):
             memcache.incr('aggregate-day', initial_value=0)
         logging.info('Processed %s day items for %s', count, today.isoformat())
         return count
+
 
 app = webapp2.WSGIApplication([
     ('/tasks/cron/aggregate', AggregateHandler)

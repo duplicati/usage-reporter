@@ -14,16 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import webapp2
-import dbmodel
-import json
-import os
-import datetime
 import calendar
+import datetime
+import json
 import logging
 
+import webapp2
 from google.appengine.api import memcache
 from google.appengine.ext import db
+
+import dbmodel
+
 
 def setprops(item, props):
     for p in props:
@@ -35,18 +36,17 @@ def setprops(item, props):
 
 @db.transactional(xg=True)
 def addPostInTx(rst):
-
     setprops(rst, ['setid', 'uid', 'ostype', 'osversion', 'clrversion', 'appname', 'appversion', 'assembly'])
 
     dbr = dbmodel.ReportSet(
-        setid = rst['setid'],
-        uid = rst['uid'],
-        ostype = rst['ostype'],
-        osversion = rst['osversion'],
-        clrversion = rst['clrversion'],
-        appname = rst['appname'],
-        appversion = rst['appversion'],
-        assembly = rst['assembly']
+        setid=rst['setid'],
+        uid=rst['uid'],
+        ostype=rst['ostype'],
+        osversion=rst['osversion'],
+        clrversion=rst['clrversion'],
+        appname=rst['appname'],
+        appversion=rst['appversion'],
+        assembly=rst['assembly']
     )
 
     dbr.put()
@@ -58,7 +58,6 @@ def addPostInTx(rst):
         ts = 0
         c = 0
         data = None
-
 
         try:
             if (n.has_key('timestamp')):
@@ -73,14 +72,13 @@ def addPostInTx(rst):
             pass
 
         ri = dbmodel.ReportItem(
-            reportset = dbr, 
-            timestamp = ts,
-            eventtype = n['type'],
-            count = c,
-            name = n['name'],
-            data = n['data']
+            reportset=dbr,
+            timestamp=ts,
+            eventtype=n['type'],
+            count=c,
+            name=n['name'],
+            data=n['data']
         ).put()
-
 
 
 class ReportHandler(webapp2.RequestHandler):
@@ -93,6 +91,7 @@ class ReportHandler(webapp2.RequestHandler):
         except:
             logging.info('Failed to load: %s', self.request.body)
             raise
+
 
 class ViewHandler(webapp2.RequestHandler):
     def write_input_error(message):
@@ -124,7 +123,7 @@ class ViewHandler(webapp2.RequestHandler):
         if starttime == None:
             ts = datetime.datetime.utcnow()
             starttime = calendar.timegm((ts.year, ts.month, ts.day, 0, 0, 0))
-            
+
         if rangetype == None:
             rangetype = 'day'
 
@@ -149,7 +148,8 @@ class ViewHandler(webapp2.RequestHandler):
         if ix == None or type(ix) != type(1):
             ix = 0
 
-        cacheurl = '%s:/view?fromtime=%s&rangetype=%s&page_size=%s&page_offset=%s' %(ix, starttime, rangetype, page_size, page_offset)
+        cacheurl = '%s:/view?fromtime=%s&rangetype=%s&page_size=%s&page_offset=%s' % (
+        ix, starttime, rangetype, page_size, page_offset)
         res = memcache.get(cacheurl)
 
         if res == None:
@@ -157,23 +157,28 @@ class ViewHandler(webapp2.RequestHandler):
             prevtime = None
             items = []
 
-            for x in dbmodel.AggregateItem.all().filter('timestamp <=', starttime).filter('rangetype', rangetype).order('-timestamp').run(offset=page_offset):
+            for x in dbmodel.AggregateItem.all().filter('timestamp <=', starttime).filter('rangetype', rangetype).order(
+                    '-timestamp').run(offset=page_offset):
                 if prevtime != x.timestamp:
                     prevtime = x.timestamp
                     if remains == 0:
                         break
                     remains -= 1
 
-                items.append({'name': x.name, 'value': x.value, 'ostype': x.ostype, 'sum': x.value_sum, 'count': x.entry_count, 'lastupdated': x.lastupdated, 'timestamp': x.timestamp})
+                items.append(
+                    {'name': x.name, 'value': x.value, 'ostype': x.ostype, 'sum': x.value_sum, 'count': x.entry_count,
+                     'lastupdated': x.lastupdated, 'timestamp': x.timestamp})
 
-            res = json.dumps({'kind': 'aggregate-' + rangetype, 'page_size': page_size, 'offset': page_offset, 'next_offset': page_offset + len(items), 'count': len(items), 'fromtime': starttime, 'rangetype': rangetype, 'items': items, 'fetched': calendar.timegm(datetime.datetime.utcnow().timetuple())})
+            res = json.dumps({'kind': 'aggregate-' + rangetype, 'page_size': page_size, 'offset': page_offset,
+                              'next_offset': page_offset + len(items), 'count': len(items), 'fromtime': starttime,
+                              'rangetype': rangetype, 'items': items,
+                              'fetched': calendar.timegm(datetime.datetime.utcnow().timetuple())})
 
             memcache.add(cacheurl, res)
 
         self.response.status = 200
         self.response.headers['Content-Type'] = 'application/json'
         self.response.write(res)
-
 
 
 app = webapp2.WSGIApplication([
